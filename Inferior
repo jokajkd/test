@@ -286,10 +286,42 @@ if placeId == 80561320113856 then
 elseif placeId == 15899178400 then
     print("🎯 Running Party Creation Script...")
     
-    -- Enhanced party creation with retry logic
-    local function createPartyWithRetry()
-        local maxRetries = 3
-        local retryDelay = 2
+    -- Function to check if we're actually in a game (not stuck in lobby)
+    local function verifyInGame()
+        -- Check for game-specific objects that indicate we're in a match
+        local gameIndicators = {
+            workspace:FindFirstChild("CURRENT_MAP"),
+            workspace:FindFirstChild("Zombie"),
+            workspace:FindFirstChild("RoundSystem"),
+            workspace:FindFirstChild("GameStarted")
+        }
+        
+        for _, indicator in pairs(gameIndicators) do
+            if indicator then
+                return true
+            end
+        end
+        
+        -- Check if we're in the actual lobby (not in a game)
+        local lobbyIndicators = {
+            workspace:FindFirstChild("Lobby"),
+            workspace:FindFirstChild("PartySystem"),
+            workspace:FindFirstChild("StartGame")
+        }
+        
+        for _, indicator in pairs(lobbyIndicators) do
+            if indicator then
+                return false -- We're in lobby, not in game
+            end
+        end
+        
+        return false -- Default to lobby if unsure
+    end
+
+    -- Enhanced party creation with verification
+    local function createPartyWithVerification()
+        local maxRetries = 5
+        local retryDelay = 3
         
         for attempt = 1, maxRetries do
             print("🔄 Attempt " .. attempt .. " to create party...")
@@ -308,24 +340,34 @@ elseif placeId == 15899178400 then
             end)
             
             if success then
-                print("✅ Party created successfully!")
-                return true
+                print("✅ Party creation signal sent!")
+                
+                -- Wait and verify if we actually got into a game
+                wait(5)
+                
+                if verifyInGame() then
+                    print("🎉 Successfully entered the game!")
+                    return true
+                else
+                    print("⚠️ Party created but still in lobby, retrying...")
+                end
             else
                 print("❌ Party creation failed (attempt " .. attempt .. "):", errorMsg)
-                if attempt < maxRetries then
-                    print("⏳ Retrying in " .. retryDelay .. " seconds...")
-                    wait(retryDelay)
-                end
+            end
+            
+            if attempt < maxRetries then
+                print("⏳ Retrying in " .. retryDelay .. " seconds...")
+                wait(retryDelay)
             end
         end
         
         return false
     end
 
-    -- Enhanced game start with retry logic
-    local function startGameWithRetry()
-        local maxRetries = 3
-        local retryDelay = 2
+    -- Enhanced game start with verification
+    local function startGameWithVerification()
+        local maxRetries = 5
+        local retryDelay = 3
         
         for attempt = 1, maxRetries do
             print("🔄 Attempt " .. attempt .. " to start game...")
@@ -336,31 +378,86 @@ elseif placeId == 15899178400 then
             end)
             
             if success then
-                print("✅ Game started successfully!")
-                return true
+                print("✅ Game start signal sent!")
+                
+                -- Wait and verify if game actually started
+                wait(5)
+                
+                if verifyInGame() then
+                    print("🎉 Game started successfully!")
+                    return true
+                else
+                    print("⚠️ Start signal sent but still in lobby, retrying...")
+                end
             else
                 print("❌ Game start failed (attempt " .. attempt .. "):", errorMsg)
-                if attempt < maxRetries then
-                    print("⏳ Retrying in " .. retryDelay .. " seconds...")
-                    wait(retryDelay)
-                end
+            end
+            
+            if attempt < maxRetries then
+                print("⏳ Retrying in " .. retryDelay .. " seconds...")
+                wait(retryDelay)
             end
         end
         
         return false
     end
 
-    -- Execute party creation and game start with retries
-    if createPartyWithRetry() then
-        wait(1) -- Wait a moment then start the game
+    -- Alternative: Try different room IDs if current one fails
+    local function tryDifferentRooms()
+        local roomIDs = {302389339, 302389340, 302389341, 302389342}
+        local bosses = {"Infector", "DeadLight", "Necromancer"}
         
-        if startGameWithRetry() then
-            print("🎉 Party creation and game start completed successfully!")
+        for _, roomId in pairs(roomIDs) do
+            for _, boss in pairs(bosses) do
+                print("🔄 Trying Room ID: " .. roomId .. " with Boss: " .. boss)
+                
+                local success = pcall(function()
+                    local A_1 = "CREATE"
+                    local A_2 = {
+                        ["RoomID"] = roomId, 
+                        ["Boss"] = boss, 
+                        ["Limit"] = 4, 
+                        ["Status"] = false, 
+                        ["Password"] = "teah"
+                    }
+                    game:GetService("ReplicatedStorage").PartySystem:FireServer(A_1, A_2)
+                end)
+                
+                if success then
+                    wait(5)
+                    if verifyInGame() then
+                        print("🎉 Success with Room " .. roomId .. " and Boss " .. boss)
+                        return true
+                    end
+                end
+                
+                wait(2) -- Wait between attempts
+            end
+        end
+        return false
+    end
+
+    -- Main execution with fallback options
+    print("🚀 Starting party creation process...")
+    
+    -- First try the standard method
+    if createPartyWithVerification() then
+        wait(2)
+        if startGameWithVerification() then
+            print("🎉 Party system completed successfully!")
         else
-            warn("⚠️ Party created but game failed to start after multiple attempts")
+            print("⚠️ Party created but start failed, trying alternative methods...")
+            tryDifferentRooms()
         end
     else
-        warn("⚠️ Failed to create party after multiple attempts")
+        print("⚠️ Standard party creation failed, trying alternative rooms...")
+        if not tryDifferentRooms() then
+            warn("❌ All party creation attempts failed!")
+            print("💡 Possible solutions:")
+            print("   - Wait for server to be less busy")
+            print("   - Try a different room ID")
+            print("   - Check if the game has updates")
+        end
     end
 
 else
