@@ -76,70 +76,205 @@ pcall(overridePlayerName)
 pcall(hideNametag)
 print("✅ Username hidden! Showing as: " .. fakeName)
 
--- Simple Party System with Continuous Retry
-local function startPartySystem()
-    local function createParty()
-        local success, errorMsg = pcall(function()
-            local A_1 = "CREATE"
-            local A_2 = {
-                ["RoomID"] = 302389339, 
-                ["Boss"] = "Infector", 
-                ["Limit"] = 4, 
-                ["Status"] = false, 
-                ["Password"] = "teah"
-            }
-            game:GetService("ReplicatedStorage").PartySystem:FireServer(A_1, A_2)
-        end)
-        
-        if success then
-            print("✅ Party created successfully!")
-            return true
-        else
-            print("❌ Party creation failed:", errorMsg)
-            return false
-        end
-    end
-
-    local function startGame()
-        local success, errorMsg = pcall(function()
-            local args = {"START"}
-            game:GetService("ReplicatedStorage"):WaitForChild("PartySystem"):FireServer(unpack(args))
-        end)
-        
-        if success then
-            print("✅ Game started successfully!")
-            return true
-        else
-            print("❌ Game start failed:", errorMsg)
-            return false
-        end
-    end
-
-    -- Keep trying until successful
-    while true do
-        print("🔄 Attempting to create party and start game...")
-        
-        if createParty() then
-            wait(2)
-            if startGame() then
-                print("🎉 Party system completed successfully!")
-                break
-            end
-        end
-        
-        print("⏳ Retrying in 5 seconds...")
-        wait(5)
-    end
-end
-
--- Check game place ID
+-- Check game place ID and run specific scripts
 local placeId = game.PlaceId
 print("📍 Current Place ID:", placeId)
 
-if placeId == 15899178400 then
-    print("🎯 Starting Party System...")
+if placeId == 80561320113856 then
+    print("🎯 Running Sewers Zombie Attack Script...")
+    
+    -- Delete specified objects
+    local success1, error1 = pcall(function()
+        game:GetService("ReplicatedStorage").game_remotez.call_CONDITIONCHANGES:Destroy()
+    end)
+
+    local success2, error2 = pcall(function()
+        game:GetService("ReplicatedStorage").ErrorReporter:Destroy()
+    end)
+
+    -- Print deletion results
+    if success1 then
+        print("Successfully deleted: game:GetService(\"ReplicatedStorage\").game_remotez.call_CONDITIONCHANGES")
+    else
+        print("Error deleting call_CONDITIONCHANGES:", error1)
+    end
+
+    if success2 then
+        print("Successfully deleted: game:GetService(\"ReplicatedStorage\").ErrorReporter")
+    else
+        print("Error deleting ErrorReporter:", error2)
+    end
+
+    -- Run the firing script for Sewers map
+    local args = {
+        "Gun",
+        game:GetService("Players").LocalPlayer.Character:WaitForChild("Dual Zeus"),
+        workspace:WaitForChild("CURRENT_MAP"):WaitForChild("Sewers"):WaitForChild("Zombie"):WaitForChild("Head"),
+        {
+            {
+                ChargeLevel = 0,
+                ClientHitSize = Vector3.new(3.1703529357910156, 3.889321804046631, 3.8566854000091553),
+                Distance = 36.665489196777344,
+                ModuleName = "1",
+                BulletId = "21,21|Bullet_{E6C22CEB-4569!2 C 3 F - A 3 D 0 - 8 E 5 B 0 6!.!, 9 E }"
+            },
+            {
+                ChargeLevel = false,
+                ClientHitSize = false,
+                Distance = false,
+                ModuleName = false,
+                BulletId = true
+            }
+        }
+    }
+
+    local isFiring = true
+    local firingRate = 0.0000000000000000000000000000000000000001
+    local shotsPerBurst = 100
+
+    -- Function to check if zombie is dead or game is finished
+    local function checkGameStatus()
+        local currentMap = workspace:WaitForChild("CURRENT_MAP")
+        local sewers = currentMap:WaitForChild("Sewers")
+        local zombie = sewers:WaitForChild("Zombie")
+        
+        -- Check if zombie exists and has health
+        if zombie:FindFirstChild("Humanoid") then
+            local humanoid = zombie.Humanoid
+            if humanoid.Health <= 0 then
+                print("🎯 Zombie defeated! Teleporting to lobby...")
+                return true
+            end
+        end
+        
+        -- Check if head exists (zombie might be dead if head is missing)
+        if not zombie:FindFirstChild("Head") then
+            print("🎯 Zombie head missing! Teleporting to lobby...")
+            return true
+        end
+        
+        -- Check for game completion signals
+        local gameFinished = workspace:FindFirstChild("GameFinished") or 
+                            workspace:FindFirstChild("LevelComplete") or
+                            workspace:FindFirstChild("MissionComplete")
+        
+        if gameFinished then
+            print("🎯 Game completed! Teleporting to lobby...")
+            return true
+        end
+        
+        return false
+    end
+
+    -- Function to teleport to the lobby
+    local function teleportToLobby()
+        local TeleportService = game:GetService("TeleportService")
+        local targetPlaceId = 15899178400
+        
+        print("🚀 Teleporting to lobby (place ID: " .. targetPlaceId .. ")")
+        
+        local success, errorMsg = pcall(function()
+            TeleportService:Teleport(targetPlaceId)
+        end)
+        
+        if not success then
+            warn("❌ Teleport failed:", errorMsg)
+            print("⚠️  Please join place ID 15899178400 manually")
+        end
+    end
+
+    -- Monitor game status
+    local function startGameMonitor()
+        while true do
+            if checkGameStatus() then
+                teleportToLobby()
+                break
+            end
+            wait(1)
+        end
+    end
+
+    local function startFiring()
+        while isFiring do
+            for i = 1, shotsPerBurst do
+                game:GetService("ReplicatedStorage").Remotes.InflictTarget:FireServer(unpack(args))
+            end
+            wait(firingRate)
+        end
+    end
+
+    -- Start firing automatically
+    spawn(startFiring)
+    print("🔥 Automatic firing started!")
+
+    -- Start monitoring the game status
+    spawn(startGameMonitor)
+
+    print("Firing script loaded! Automatic rapid fire enabled.")
+    print("Game monitor active - will auto-teleport to lobby when zombie is defeated!")
+
+elseif placeId == 15899178400 then
+    print("🎯 Running Party Creation Script...")
+    
+    -- Simple Party System with Continuous Retry
+    local function startPartySystem()
+        local function createParty()
+            local success, errorMsg = pcall(function()
+                local A_1 = "CREATE"
+                local A_2 = {
+                    ["RoomID"] = 302389339, 
+                    ["Boss"] = "Infector", 
+                    ["Limit"] = 4, 
+                    ["Status"] = false, 
+                    ["Password"] = "teah"
+                }
+                game:GetService("ReplicatedStorage").PartySystem:FireServer(A_1, A_2)
+            end)
+            
+            if success then
+                print("✅ Party created successfully!")
+                return true
+            else
+                print("❌ Party creation failed:", errorMsg)
+                return false
+            end
+        end
+
+        local function startGame()
+            local success, errorMsg = pcall(function()
+                local args = {"START"}
+                game:GetService("ReplicatedStorage"):WaitForChild("PartySystem"):FireServer(unpack(args))
+            end)
+            
+            if success then
+                print("✅ Game started successfully!")
+                return true
+            else
+                print("❌ Game start failed:", errorMsg)
+                return false
+            end
+        end
+
+        -- Keep trying until successful
+        while true do
+            print("🔄 Attempting to create party and start game...")
+            
+            if createParty() then
+                wait(2)
+                if startGame() then
+                    print("🎉 Party system completed successfully!")
+                    break
+                end
+            end
+            
+            print("⏳ Retrying in 5 seconds...")
+            wait(5)
+        end
+    end
+
     startPartySystem()
+
 else
-    print("❌ This script only works in the lobby (Place ID: 15899178400)")
-    print("ℹ️ Current Place ID:", placeId)
+    print("❌ No specific script for this game place ID:", placeId)
+    print("ℹ️  Supported Place IDs: 80561320113856 (Sewers Zombie Game) or 15899178400 (Party Lobby)")
 end
