@@ -5,70 +5,27 @@ local fakeName = "GameChanger"
 
 -- Function to hide username in GUIs
 local function hideUsernameInGUIs()
-    -- Monitor PlayerGui for new GUI elements
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     
     local function updateTextElements(parent)
         for _, gui in pairs(parent:GetDescendants()) do
             if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
                 local text = gui.Text
-                if text and type(text) == "string" then
-                    -- Replace actual username with fake name
-                    if text:find(LocalPlayer.Name) then
-                        gui.Text = text:gsub(LocalPlayer.Name, fakeName)
-                    end
+                if text and type(text) == "string" and text:find(LocalPlayer.Name) then
+                    gui.Text = text:gsub(LocalPlayer.Name, fakeName)
                 end
             end
         end
     end
     
-    -- Update existing GUI elements
     updateTextElements(playerGui)
     
-    -- Monitor for new GUI elements
     playerGui.DescendantAdded:Connect(function(descendant)
         if descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox") then
-            wait() -- Wait for properties to load
-            local text = descendant.Text
-            if text and type(text) == "string" then
-                if text:find(LocalPlayer.Name) then
-                    descendant.Text = text:gsub(LocalPlayer.Name, fakeName)
-                end
-            end
-        end
-    end)
-end
-
--- Function to hide username in leaderboard and player list
-local function hideUsernameInLeaderboard()
-    -- Monitor CoreGui for leaderboard elements
-    local coreGui = game:GetService("CoreGui")
-    
-    local function updateLeaderboardElements(parent)
-        for _, gui in pairs(parent:GetDescendants()) do
-            if gui:IsA("TextLabel") then
-                local text = gui.Text
-                if text and type(text) == "string" then
-                    if text:find(LocalPlayer.Name) then
-                        gui.Text = text:gsub(LocalPlayer.Name, fakeName)
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Update existing leaderboard elements
-    updateLeaderboardElements(coreGui)
-    
-    -- Monitor for new leaderboard elements
-    coreGui.DescendantAdded:Connect(function(descendant)
-        if descendant:IsA("TextLabel") then
             wait()
             local text = descendant.Text
-            if text and type(text) == "string" then
-                if text:find(LocalPlayer.Name) then
-                    descendant.Text = text:gsub(LocalPlayer.Name, fakeName)
-                end
+            if text and type(text) == "string" and text:find(LocalPlayer.Name) then
+                descendant.Text = text:gsub(LocalPlayer.Name, fakeName)
             end
         end
     end)
@@ -76,12 +33,10 @@ end
 
 -- Function to override player name property
 local function overridePlayerName()
-    -- Hook into the player's name property
     local mt = getrawmetatable(LocalPlayer)
     if mt then
         local oldIndex = mt.__index
         setreadonly(mt, false)
-        
         mt.__index = function(t, k)
             if tostring(k) == "Name" or tostring(k) == "DisplayName" then
                 return fakeName
@@ -92,42 +47,20 @@ local function overridePlayerName()
     end
 end
 
--- Function to hide username in chat
-local function hideUsernameInChat()
-    local TextChatService = game:GetService("TextChatService")
-    
-    if TextChatService then
-        TextChatService.MessageReceived:Connect(function(message)
-            if message.TextSource then
-                local speaker = message.TextSource
-                if speaker.Name == LocalPlayer.Name then
-                    -- This would require more advanced chat manipulation
-                    -- which may not be possible in all games
-                end
-            end
-        end)
-    end
-end
-
 -- Function to hide username above character (nametag)
 local function hideNametag()
     LocalPlayer.CharacterAdded:Connect(function(character)
         local humanoid = character:WaitForChild("Humanoid")
-        
-        -- Monitor for nametag changes
         humanoid:GetPropertyChangedSignal("DisplayName"):Connect(function()
             if humanoid.DisplayName == LocalPlayer.Name then
                 humanoid.DisplayName = fakeName
             end
         end)
-        
-        -- Set initial nametag
         if humanoid.DisplayName == LocalPlayer.Name then
             humanoid.DisplayName = fakeName
         end
     end)
     
-    -- Handle existing character
     if LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
         if humanoid and humanoid.DisplayName == LocalPlayer.Name then
@@ -139,55 +72,17 @@ end
 -- Initialize username hiding
 print("🕵️ Initializing username hiding...")
 pcall(hideUsernameInGUIs)
-pcall(hideUsernameInLeaderboard)
 pcall(overridePlayerName)
-pcall(hideUsernameInChat)
 pcall(hideNametag)
 print("✅ Username hidden! Showing as: " .. fakeName)
 
--- Function to check if we're in lobby (based on game state)
-local function isInLobby()
-    -- Check for lobby indicators
-    local lobbyIndicators = {
-        workspace:FindFirstChild("Lobby"),
-        workspace:FindFirstChild("PartySystem"),
-        workspace:FindFirstChild("StartGame"),
-        workspace:FindFirstChild("MainMenu")
-    }
-    
-    -- Check for absence of game indicators
-    local gameIndicators = {
-        workspace:FindFirstChild("CURRENT_MAP"),
-        workspace:FindFirstChild("Zombie"),
-        workspace:FindFirstChild("RoundSystem"),
-        workspace:FindFirstChild("GameStarted")
-    }
-    
-    -- If we have lobby indicators AND no game indicators, we're in lobby
-    for _, indicator in pairs(lobbyIndicators) do
-        if indicator then
-            for _, gameIndicator in pairs(gameIndicators) do
-                if gameIndicator then
-                    return false -- We have game indicators, so we're in a game
-                end
-            end
-            return true -- We have lobby indicators and no game indicators
-        end
-    end
-    
-    return false -- Default to not in lobby
-end
-
--- Enhanced Party System with Continuous Monitoring
+-- Simple Party System with Continuous Retry
 local function startPartySystem()
-    local partyActive = false
-    
     local function createParty()
-        print("🔄 Creating party...")
         local success, errorMsg = pcall(function()
             local A_1 = "CREATE"
             local A_2 = {
-                ["RoomID"] = math.random(300000000, 400000000), -- Random room ID
+                ["RoomID"] = 302389339, 
                 ["Boss"] = "Infector", 
                 ["Limit"] = 4, 
                 ["Status"] = false, 
@@ -197,257 +92,54 @@ local function startPartySystem()
         end)
         
         if success then
-            print("✅ Party creation signal sent!")
+            print("✅ Party created successfully!")
             return true
         else
             print("❌ Party creation failed:", errorMsg)
             return false
         end
     end
-    
+
     local function startGame()
-        print("🔄 Starting game...")
         local success, errorMsg = pcall(function()
             local args = {"START"}
             game:GetService("ReplicatedStorage"):WaitForChild("PartySystem"):FireServer(unpack(args))
         end)
         
         if success then
-            print("✅ Game start signal sent!")
+            print("✅ Game started successfully!")
             return true
         else
             print("❌ Game start failed:", errorMsg)
             return false
         end
     end
-    
-    -- Continuous lobby monitoring
+
+    -- Keep trying until successful
     while true do
-        local currentPlaceId = game.PlaceId
+        print("🔄 Attempting to create party and start game...")
         
-        if currentPlaceId == 15899178400 or isInLobby() then
-            print("📍 In Lobby (Place ID: " .. currentPlaceId .. ") - Activating Party System")
-            
-            if not partyActive then
-                partyActive = true
-                
-                -- Try to create party and start game
-                wait(2)
-                if createParty() then
-                    wait(3)
-                    startGame()
-                end
-                
-                -- Set up periodic retry
-                spawn(function()
-                    local retryCount = 0
-                    local maxRetries = 10
-                    
-                    while partyActive and retryCount < maxRetries do
-                        wait(10) -- Retry every 10 seconds
-                        
-                        if isInLobby() then
-                            print("🔄 Still in lobby, retrying party system... (" .. (retryCount + 1) .. "/" .. maxRetries .. ")")
-                            createParty()
-                            wait(2)
-                            startGame()
-                            retryCount = retryCount + 1
-                        else
-                            print("✅ Successfully left lobby!")
-                            break
-                        end
-                    end
-                    
-                    if retryCount >= maxRetries then
-                        print("⚠️ Max retries reached, stopping party system")
-                        partyActive = false
-                    end
-                end)
-            end
-        else
-            if partyActive then
-                print("✅ Left lobby, stopping party system")
-                partyActive = false
-            end
-        end
-        
-        wait(5) -- Check every 5 seconds
-    end
-end
-
--- Main Game Logic with Continuous Place ID Monitoring
-local function startMainSystem()
-    local lastPlaceId = game.PlaceId
-    
-    while true do
-        local currentPlaceId = game.PlaceId
-        
-        -- If place ID changed, re-run the appropriate script
-        if currentPlaceId ~= lastPlaceId then
-            print("🔄 Place ID changed from " .. lastPlaceId .. " to " .. currentPlaceId)
-            lastPlaceId = currentPlaceId
-            
-            -- Stop any existing processes and restart
-            if currentPlaceId == 80561320113856 then
-                print("🎯 Switching to Sewers Zombie Attack Script...")
-                runSewersScript()
-            elseif currentPlaceId == 15899178400 then
-                print("🎯 Switching to Lobby Party System...")
-                -- Party system is already running continuously
-            else
-                print("❌ Unknown place ID: " .. currentPlaceId)
-            end
-        end
-        
-        wait(3) -- Check place ID every 3 seconds
-    end
-end
-
--- Sewers Zombie Attack Script
-local function runSewersScript()
-    print("🎯 Running Sewers Zombie Attack Script...")
-    
-    -- Delete specified objects
-    local success1, error1 = pcall(function()
-        game:GetService("ReplicatedStorage").game_remotez.call_CONDITIONCHANGES:Destroy()
-    end)
-
-    local success2, error2 = pcall(function()
-        game:GetService("ReplicatedStorage").ErrorReporter:Destroy()
-    end)
-
-    -- Print deletion results
-    if success1 then
-        print("Successfully deleted: game:GetService(\"ReplicatedStorage\").game_remotez.call_CONDITIONCHANGES")
-    else
-        print("Error deleting call_CONDITIONCHANGES:", error1)
-    end
-
-    if success2 then
-        print("Successfully deleted: game:GetService(\"ReplicatedStorage\").ErrorReporter")
-    else
-        print("Error deleting ErrorReporter:", error2)
-    end
-
-    -- Run the firing script for Sewers map
-    local args = {
-        "Gun",
-        game:GetService("Players").LocalPlayer.Character:WaitForChild("Dual Zeus"),
-        workspace:WaitForChild("CURRENT_MAP"):WaitForChild("Sewers"):WaitForChild("Zombie"):WaitForChild("Head"),
-        {
-            {
-                ChargeLevel = 0,
-                ClientHitSize = Vector3.new(3.1703529357910156, 3.889321804046631, 3.8566854000091553),
-                Distance = 36.665489196777344,
-                ModuleName = "1",
-                BulletId = "21,21|Bullet_{E6C22CEB-4569!2 C 3 F - A 3 D 0 - 8 E 5 B 0 6!.!, 9 E }"
-            },
-            {
-                ChargeLevel = false,
-                ClientHitSize = false,
-                Distance = false,
-                ModuleName = false,
-                BulletId = true
-            }
-        }
-    }
-
-    local isFiring = true
-    local firingRate = 0.0000000000000000000000000000000000000001
-    local shotsPerBurst = 100
-
-    -- Function to check if zombie is dead or game is finished
-    local function checkGameStatus()
-        local currentMap = workspace:WaitForChild("CURRENT_MAP")
-        local sewers = currentMap:WaitForChild("Sewers")
-        local zombie = sewers:WaitForChild("Zombie")
-        
-        if zombie:FindFirstChild("Humanoid") then
-            local humanoid = zombie.Humanoid
-            if humanoid.Health <= 0 then
-                print("🎯 Zombie defeated! Teleporting to lobby...")
-                return true
-            end
-        end
-        
-        if not zombie:FindFirstChild("Head") then
-            print("🎯 Zombie head missing! Teleporting to lobby...")
-            return true
-        end
-        
-        local gameFinished = workspace:FindFirstChild("GameFinished") or 
-                            workspace:FindFirstChild("LevelComplete") or
-                            workspace:FindFirstChild("MissionComplete")
-        
-        if gameFinished then
-            print("🎯 Game completed! Teleporting to lobby...")
-            return true
-        end
-        
-        return false
-    end
-
-    -- Function to teleport to the lobby
-    local function teleportToLobby()
-        local TeleportService = game:GetService("TeleportService")
-        local targetPlaceId = 15899178400
-        
-        print("🚀 Teleporting to lobby (place ID: " .. targetPlaceId .. ")")
-        
-        local success, errorMsg = pcall(function()
-            TeleportService:Teleport(targetPlaceId)
-        end)
-        
-        if not success then
-            warn("❌ Teleport failed:", errorMsg)
-            print("⚠️  Please join place ID 15899178400 manually")
-        end
-    end
-
-    -- Monitor game status
-    local function startGameMonitor()
-        while true do
-            if checkGameStatus() then
-                teleportToLobby()
+        if createParty() then
+            wait(2)
+            if startGame() then
+                print("🎉 Party system completed successfully!")
                 break
             end
-            wait(1)
         end
+        
+        print("⏳ Retrying in 5 seconds...")
+        wait(5)
     end
-
-    local function startFiring()
-        while isFiring do
-            for i = 1, shotsPerBurst do
-                game:GetService("ReplicatedStorage").Remotes.InflictTarget:FireServer(unpack(args))
-            end
-            wait(firingRate)
-        end
-    end
-
-    -- Start firing automatically
-    spawn(startFiring)
-    print("🔥 Automatic firing started!")
-
-    -- Start monitoring the game status
-    spawn(startGameMonitor)
-
-    print("Firing script loaded! Automatic rapid fire enabled.")
-    print("Game monitor active - will auto-teleport to lobby when zombie is defeated!")
 end
 
--- Start both monitoring systems
-print("🚀 Starting continuous monitoring systems...")
-spawn(startPartySystem)  -- Always runs party system when in lobby
-spawn(startMainSystem)   -- Monitors place ID changes
+-- Check game place ID
+local placeId = game.PlaceId
+print("📍 Current Place ID:", placeId)
 
--- Initial script execution based on current place
-local currentPlaceId = game.PlaceId
-print("📍 Current Place ID:", currentPlaceId)
-
-if currentPlaceId == 80561320113856 then
-    runSewersScript()
-elseif currentPlaceId == 15899178400 then
-    print("🎯 In Lobby - Party System Activated")
+if placeId == 15899178400 then
+    print("🎯 Starting Party System...")
+    startPartySystem()
 else
-    print("❌ Unknown place ID:", currentPlaceId)
+    print("❌ This script only works in the lobby (Place ID: 15899178400)")
+    print("ℹ️ Current Place ID:", placeId)
 end
