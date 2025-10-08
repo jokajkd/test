@@ -145,11 +145,166 @@ pcall(hideUsernameInChat)
 pcall(hideNametag)
 print("✅ Username hidden! Showing as: " .. fakeName)
 
--- Check game place ID and run specific scripts
-local placeId = game.PlaceId
-print("📍 Current Place ID:", placeId)
+-- Function to check if we're in lobby (based on game state)
+local function isInLobby()
+    -- Check for lobby indicators
+    local lobbyIndicators = {
+        workspace:FindFirstChild("Lobby"),
+        workspace:FindFirstChild("PartySystem"),
+        workspace:FindFirstChild("StartGame"),
+        workspace:FindFirstChild("MainMenu")
+    }
+    
+    -- Check for absence of game indicators
+    local gameIndicators = {
+        workspace:FindFirstChild("CURRENT_MAP"),
+        workspace:FindFirstChild("Zombie"),
+        workspace:FindFirstChild("RoundSystem"),
+        workspace:FindFirstChild("GameStarted")
+    }
+    
+    -- If we have lobby indicators AND no game indicators, we're in lobby
+    for _, indicator in pairs(lobbyIndicators) do
+        if indicator then
+            for _, gameIndicator in pairs(gameIndicators) do
+                if gameIndicator then
+                    return false -- We have game indicators, so we're in a game
+                end
+            end
+            return true -- We have lobby indicators and no game indicators
+        end
+    end
+    
+    return false -- Default to not in lobby
+end
 
-if placeId == 80561320113856 then
+-- Enhanced Party System with Continuous Monitoring
+local function startPartySystem()
+    local partyActive = false
+    
+    local function createParty()
+        print("🔄 Creating party...")
+        local success, errorMsg = pcall(function()
+            local A_1 = "CREATE"
+            local A_2 = {
+                ["RoomID"] = math.random(300000000, 400000000), -- Random room ID
+                ["Boss"] = "Infector", 
+                ["Limit"] = 4, 
+                ["Status"] = false, 
+                ["Password"] = "teah"
+            }
+            game:GetService("ReplicatedStorage").PartySystem:FireServer(A_1, A_2)
+        end)
+        
+        if success then
+            print("✅ Party creation signal sent!")
+            return true
+        else
+            print("❌ Party creation failed:", errorMsg)
+            return false
+        end
+    end
+    
+    local function startGame()
+        print("🔄 Starting game...")
+        local success, errorMsg = pcall(function()
+            local args = {"START"}
+            game:GetService("ReplicatedStorage"):WaitForChild("PartySystem"):FireServer(unpack(args))
+        end)
+        
+        if success then
+            print("✅ Game start signal sent!")
+            return true
+        else
+            print("❌ Game start failed:", errorMsg)
+            return false
+        end
+    end
+    
+    -- Continuous lobby monitoring
+    while true do
+        local currentPlaceId = game.PlaceId
+        
+        if currentPlaceId == 15899178400 or isInLobby() then
+            print("📍 In Lobby (Place ID: " .. currentPlaceId .. ") - Activating Party System")
+            
+            if not partyActive then
+                partyActive = true
+                
+                -- Try to create party and start game
+                wait(2)
+                if createParty() then
+                    wait(3)
+                    startGame()
+                end
+                
+                -- Set up periodic retry
+                spawn(function()
+                    local retryCount = 0
+                    local maxRetries = 10
+                    
+                    while partyActive and retryCount < maxRetries do
+                        wait(10) -- Retry every 10 seconds
+                        
+                        if isInLobby() then
+                            print("🔄 Still in lobby, retrying party system... (" .. (retryCount + 1) .. "/" .. maxRetries .. ")")
+                            createParty()
+                            wait(2)
+                            startGame()
+                            retryCount = retryCount + 1
+                        else
+                            print("✅ Successfully left lobby!")
+                            break
+                        end
+                    end
+                    
+                    if retryCount >= maxRetries then
+                        print("⚠️ Max retries reached, stopping party system")
+                        partyActive = false
+                    end
+                end)
+            end
+        else
+            if partyActive then
+                print("✅ Left lobby, stopping party system")
+                partyActive = false
+            end
+        end
+        
+        wait(5) -- Check every 5 seconds
+    end
+end
+
+-- Main Game Logic with Continuous Place ID Monitoring
+local function startMainSystem()
+    local lastPlaceId = game.PlaceId
+    
+    while true do
+        local currentPlaceId = game.PlaceId
+        
+        -- If place ID changed, re-run the appropriate script
+        if currentPlaceId ~= lastPlaceId then
+            print("🔄 Place ID changed from " .. lastPlaceId .. " to " .. currentPlaceId)
+            lastPlaceId = currentPlaceId
+            
+            -- Stop any existing processes and restart
+            if currentPlaceId == 80561320113856 then
+                print("🎯 Switching to Sewers Zombie Attack Script...")
+                runSewersScript()
+            elseif currentPlaceId == 15899178400 then
+                print("🎯 Switching to Lobby Party System...")
+                -- Party system is already running continuously
+            else
+                print("❌ Unknown place ID: " .. currentPlaceId)
+            end
+        end
+        
+        wait(3) -- Check place ID every 3 seconds
+    end
+end
+
+-- Sewers Zombie Attack Script
+local function runSewersScript()
     print("🎯 Running Sewers Zombie Attack Script...")
     
     -- Delete specified objects
@@ -197,9 +352,9 @@ if placeId == 80561320113856 then
         }
     }
 
-    local isFiring = true -- Changed to true for automatic firing
+    local isFiring = true
     local firingRate = 0.0000000000000000000000000000000000000001
-    local shotsPerBurst = 100 -- Number of shots to fire per burst
+    local shotsPerBurst = 100
 
     -- Function to check if zombie is dead or game is finished
     local function checkGameStatus()
@@ -207,7 +362,6 @@ if placeId == 80561320113856 then
         local sewers = currentMap:WaitForChild("Sewers")
         local zombie = sewers:WaitForChild("Zombie")
         
-        -- Check if zombie exists and has health
         if zombie:FindFirstChild("Humanoid") then
             local humanoid = zombie.Humanoid
             if humanoid.Health <= 0 then
@@ -216,13 +370,11 @@ if placeId == 80561320113856 then
             end
         end
         
-        -- Check if head exists (zombie might be dead if head is missing)
         if not zombie:FindFirstChild("Head") then
             print("🎯 Zombie head missing! Teleporting to lobby...")
             return true
         end
         
-        -- Check for game completion signals (you might need to adjust this based on your game)
         local gameFinished = workspace:FindFirstChild("GameFinished") or 
                             workspace:FindFirstChild("LevelComplete") or
                             workspace:FindFirstChild("MissionComplete")
@@ -259,13 +411,12 @@ if placeId == 80561320113856 then
                 teleportToLobby()
                 break
             end
-            wait(1) -- Check every second
+            wait(1)
         end
     end
 
     local function startFiring()
         while isFiring do
-            -- Fire multiple shots in quick succession
             for i = 1, shotsPerBurst do
                 game:GetService("ReplicatedStorage").Remotes.InflictTarget:FireServer(unpack(args))
             end
@@ -282,185 +433,21 @@ if placeId == 80561320113856 then
 
     print("Firing script loaded! Automatic rapid fire enabled.")
     print("Game monitor active - will auto-teleport to lobby when zombie is defeated!")
+end
 
-elseif placeId == 15899178400 then
-    print("🎯 Running Party Creation Script...")
-    
-    -- Function to check if we're actually in a game (not stuck in lobby)
-    local function verifyInGame()
-        -- Check for game-specific objects that indicate we're in a match
-        local gameIndicators = {
-            workspace:FindFirstChild("CURRENT_MAP"),
-            workspace:FindFirstChild("Zombie"),
-            workspace:FindFirstChild("RoundSystem"),
-            workspace:FindFirstChild("GameStarted")
-        }
-        
-        for _, indicator in pairs(gameIndicators) do
-            if indicator then
-                return true
-            end
-        end
-        
-        -- Check if we're in the actual lobby (not in a game)
-        local lobbyIndicators = {
-            workspace:FindFirstChild("Lobby"),
-            workspace:FindFirstChild("PartySystem"),
-            workspace:FindFirstChild("StartGame")
-        }
-        
-        for _, indicator in pairs(lobbyIndicators) do
-            if indicator then
-                return false -- We're in lobby, not in game
-            end
-        end
-        
-        return false -- Default to lobby if unsure
-    end
+-- Start both monitoring systems
+print("🚀 Starting continuous monitoring systems...")
+spawn(startPartySystem)  -- Always runs party system when in lobby
+spawn(startMainSystem)   -- Monitors place ID changes
 
-    -- Enhanced party creation with verification
-    local function createPartyWithVerification()
-        local maxRetries = 5
-        local retryDelay = 3
-        
-        for attempt = 1, maxRetries do
-            print("🔄 Attempt " .. attempt .. " to create party...")
-            
-            local success, errorMsg = pcall(function()
-                local A_1 = "CREATE"
-                local A_2 = {
-                    ["RoomID"] = 302389339, 
-                    ["Boss"] = "Infector", 
-                    ["Limit"] = 4, 
-                    ["Status"] = false, 
-                    ["Password"] = "teah"
-                }
-                local Event = game:GetService("ReplicatedStorage").PartySystem
-                Event:FireServer(A_1, A_2)
-            end)
-            
-            if success then
-                print("✅ Party creation signal sent!")
-                
-                -- Wait and verify if we actually got into a game
-                wait(5)
-                
-                if verifyInGame() then
-                    print("🎉 Successfully entered the game!")
-                    return true
-                else
-                    print("⚠️ Party created but still in lobby, retrying...")
-                end
-            else
-                print("❌ Party creation failed (attempt " .. attempt .. "):", errorMsg)
-            end
-            
-            if attempt < maxRetries then
-                print("⏳ Retrying in " .. retryDelay .. " seconds...")
-                wait(retryDelay)
-            end
-        end
-        
-        return false
-    end
+-- Initial script execution based on current place
+local currentPlaceId = game.PlaceId
+print("📍 Current Place ID:", currentPlaceId)
 
-    -- Enhanced game start with verification
-    local function startGameWithVerification()
-        local maxRetries = 5
-        local retryDelay = 3
-        
-        for attempt = 1, maxRetries do
-            print("🔄 Attempt " .. attempt .. " to start game...")
-            
-            local success, errorMsg = pcall(function()
-                local args = {"START"}
-                game:GetService("ReplicatedStorage"):WaitForChild("PartySystem"):FireServer(unpack(args))
-            end)
-            
-            if success then
-                print("✅ Game start signal sent!")
-                
-                -- Wait and verify if game actually started
-                wait(5)
-                
-                if verifyInGame() then
-                    print("🎉 Game started successfully!")
-                    return true
-                else
-                    print("⚠️ Start signal sent but still in lobby, retrying...")
-                end
-            else
-                print("❌ Game start failed (attempt " .. attempt .. "):", errorMsg)
-            end
-            
-            if attempt < maxRetries then
-                print("⏳ Retrying in " .. retryDelay .. " seconds...")
-                wait(retryDelay)
-            end
-        end
-        
-        return false
-    end
-
-    -- Alternative: Try different room IDs if current one fails
-    local function tryDifferentRooms()
-        local roomIDs = {302389339, 302389340, 302389341, 302389342}
-        local bosses = {"Infector", "DeadLight", "Necromancer"}
-        
-        for _, roomId in pairs(roomIDs) do
-            for _, boss in pairs(bosses) do
-                print("🔄 Trying Room ID: " .. roomId .. " with Boss: " .. boss)
-                
-                local success = pcall(function()
-                    local A_1 = "CREATE"
-                    local A_2 = {
-                        ["RoomID"] = roomId, 
-                        ["Boss"] = boss, 
-                        ["Limit"] = 4, 
-                        ["Status"] = false, 
-                        ["Password"] = "teah"
-                    }
-                    game:GetService("ReplicatedStorage").PartySystem:FireServer(A_1, A_2)
-                end)
-                
-                if success then
-                    wait(5)
-                    if verifyInGame() then
-                        print("🎉 Success with Room " .. roomId .. " and Boss " .. boss)
-                        return true
-                    end
-                end
-                
-                wait(2) -- Wait between attempts
-            end
-        end
-        return false
-    end
-
-    -- Main execution with fallback options
-    print("🚀 Starting party creation process...")
-    
-    -- First try the standard method
-    if createPartyWithVerification() then
-        wait(2)
-        if startGameWithVerification() then
-            print("🎉 Party system completed successfully!")
-        else
-            print("⚠️ Party created but start failed, trying alternative methods...")
-            tryDifferentRooms()
-        end
-    else
-        print("⚠️ Standard party creation failed, trying alternative rooms...")
-        if not tryDifferentRooms() then
-            warn("❌ All party creation attempts failed!")
-            print("💡 Possible solutions:")
-            print("   - Wait for server to be less busy")
-            print("   - Try a different room ID")
-            print("   - Check if the game has updates")
-        end
-    end
-
+if currentPlaceId == 80561320113856 then
+    runSewersScript()
+elseif currentPlaceId == 15899178400 then
+    print("🎯 In Lobby - Party System Activated")
 else
-    print("❌ No specific script for this game place ID:", placeId)
-    print("ℹ️  Supported Place IDs: 80561320113856 (Sewers Zombie Game) or 15899178400 (Party Lobby)")
+    print("❌ Unknown place ID:", currentPlaceId)
 end
