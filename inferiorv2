@@ -1,0 +1,212 @@
+-- Optimized Game Automation Script
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local fakeName = "GameChanger"
+
+-- Optimized username hiding
+local function setupUsernameHiding()
+    local function replaceText(text)
+        return text and type(text) == "string" and text:gsub(LocalPlayer.Name, fakeName) or text
+    end
+
+    -- Hide in PlayerGui
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local function processGUI(parent)
+        for _, gui in ipairs(parent:GetDescendants()) do
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
+                gui.Text = replaceText(gui.Text)
+            end
+        end
+    end
+    
+    processGUI(playerGui)
+    playerGui.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox") then
+            task.wait()
+            descendant.Text = replaceText(descendant.Text)
+        end
+    end)
+
+    -- Hide nametag
+    local function updateNametag(humanoid)
+        if humanoid.DisplayName == LocalPlayer.Name then
+            humanoid.DisplayName = fakeName
+        end
+    end
+
+    LocalPlayer.CharacterAdded:Connect(function(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        humanoid:GetPropertyChangedSignal("DisplayName"):Connect(function()
+            updateNametag(humanoid)
+        end)
+        updateNametag(humanoid)
+    end)
+
+    if LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if humanoid then updateNametag(humanoid) end
+    end
+end
+
+-- Initialize username hiding
+print("🕵️ Initializing username hiding...")
+pcall(setupUsernameHiding)
+print("✅ Username hidden! Showing as: " .. fakeName)
+
+-- Game configurations
+local GAME_CONFIGS = {
+    [80561320113856] = { -- Sewers Zombie Game
+        name = "Sewers Zombie Attack",
+        weapon = "Dual Zeus",
+        map = "Sewers",
+        firingArgs = {
+            "Gun",
+            nil, -- Will be set to player's weapon
+            nil, -- Will be set to zombie head
+            {
+                {
+                    ChargeLevel = 0,
+                    ClientHitSize = Vector3.new(3.1703529357910156, 3.889321804046631, 3.8566854000091553),
+                    Distance = 36.665489196777344,
+                    ModuleName = "1",
+                    BulletId = "21,21|Bullet_{E6C22CEB-4569!2 C 3 F - A 3 D 0 - 8 E 5 B 0 6!.!, 9 E }"
+                },
+                {
+                    ChargeLevel = false,
+                    ClientHitSize = false,
+                    Distance = false,
+                    ModuleName = false,
+                    BulletId = true
+                }
+            }
+        }
+    },
+    [15899178400] = { -- Party Lobby
+        name = "Party Lobby",
+        partyConfig = {
+            RoomID = 302389339, 
+            Boss = "Infector", 
+            Limit = 4, 
+            Status = false, 
+            Password = "teah"
+        }
+    }
+}
+
+-- Utility functions
+local function safeDestroy(objects)
+    for _, obj in ipairs(objects) do
+        pcall(function() obj:Destroy() end)
+    end
+end
+
+local function executeWithRetry(func, actionName, maxRetries, retryDelay)
+    for attempt = 1, maxRetries do
+        local success, result = pcall(func)
+        if success then
+            print("✅ " .. actionName .. " successful!")
+            return true, result
+        else
+            print("❌ " .. actionName .. " failed (attempt " .. attempt .. ")")
+            if attempt < maxRetries then
+                print("⏳ Retrying in " .. retryDelay .. "s...")
+                task.wait(retryDelay)
+            end
+        end
+    end
+    return false
+end
+
+-- Game-specific functions
+local function runZombieGame()
+    local config = GAME_CONFIGS[80561320113856]
+    print("🎯 Running " .. config.name .. "...")
+    
+    -- Clean up objects
+    safeDestroy({
+        game:GetService("ReplicatedStorage"):FindFirstChild("game_remotez") and 
+        game:GetService("ReplicatedStorage").game_remotez:FindFirstChild("call_CONDITIONCHANGES"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("ErrorReporter")
+    })
+
+    -- Setup firing args
+    config.firingArgs[2] = LocalPlayer.Character:WaitForChild(config.weapon)
+    config.firingArgs[3] = workspace:WaitForChild("CURRENT_MAP"):WaitForChild(config.map):WaitForChild("Zombie"):WaitForChild("Head")
+
+    -- Auto-firing system
+    local isFiring = true
+    local function startFiring()
+        while isFiring do
+            for _ = 1, 100 do
+                game:GetService("ReplicatedStorage").Remotes.InflictTarget:FireServer(unpack(config.firingArgs))
+            end
+            task.wait()
+        end
+    end
+    task.spawn(startFiring)
+    print("🔥 Automatic firing started!")
+
+    -- Game completion monitor
+    local function monitorGameCompletion()
+        while true do
+            local zombie = workspace:WaitForChild("CURRENT_MAP"):WaitForChild(config.map):WaitForChild("Zombie")
+            local humanoid = zombie:FindFirstChild("Humanoid")
+            
+            if (humanoid and humanoid.Health <= 0) or not zombie:FindFirstChild("Head") then
+                print("🎯 Game completed! Teleporting to lobby...")
+                pcall(function()
+                    game:GetService("TeleportService"):Teleport(15899178400)
+                end)
+                break
+            end
+            task.wait(1)
+        end
+    end
+    task.spawn(monitorGameCompletion)
+end
+
+local function runPartySystem()
+    local config = GAME_CONFIGS[15899178400]
+    print("🎯 Running " .. config.name .. "...")
+    
+    local function createParty()
+        return pcall(function()
+            game:GetService("ReplicatedStorage").PartySystem:FireServer("CREATE", config.partyConfig)
+        end)
+    end
+
+    local function startGame()
+        return pcall(function()
+            game:GetService("ReplicatedStorage").PartySystem:FireServer("START")
+        end)
+    end
+
+    -- Execute with retry logic
+    executeWithRetry(function()
+        if createParty() then
+            task.wait(1)
+            return startGame()
+        end
+        return false
+    end, "Party creation and game start", 3, 2)
+end
+
+-- Main execution
+local placeId = game.PlaceId
+print("📍 Current Place ID:", placeId)
+
+local config = GAME_CONFIGS[placeId]
+if config then
+    if placeId == 80561320113856 then
+        runZombieGame()
+    else
+        runPartySystem()
+    end
+else
+    print("❌ Unsupported Place ID")
+    print("ℹ️ Supported: 80561320113856 (Sewers) or 15899178400 (Lobby)")
+end
+if game.PlaceId == 15899178400 then -- Party Lobby
+    print("🔄 Waiting in lobby, ready for next game...")
+    -- Optional: Add auto-rejoin logic here if needed
+end
