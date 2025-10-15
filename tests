@@ -368,3 +368,7 @@ else
     print("❌ No specific script for this game place ID:", placeId)
     print("ℹ️  Supported Place IDs: 80561320113856 (Zombie Game) or 15899178400 (Party Game)")
 end
+if game.PlaceId == 15899178400 then -- Party Lobby
+    print("🔄 Waiting in lobby, ready for next game...")
+    -- Optional: Add auto-rejoin logic here if needed
+end
